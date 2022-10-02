@@ -42,13 +42,6 @@ def get_notas(driver):
 
             w.writerow(linha)
 
-def verifica_notas(notas):
-    with open('notas.csv', encoding='utf-8') as arquivo:
-        reader = csv.reader(arquivo)
-        if notas in reader:
-            return True
-        return False
-
 
 def envia_mensagem(mensagem):
     id_grupo = config('ID_GRUPO')
