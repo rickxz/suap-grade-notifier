@@ -28,23 +28,22 @@ def get_notas(driver):
     if verifica_arquivo():  
         with open('notas.csv', 'r', encoding='utf-8') as arquivo_read:
             notas = list(csv.reader(arquivo_read))
-    else:
-        with open('notas.csv', 'w', encoding='utf-8', newline='') as arquivo_write:
-            w = csv.writer(arquivo_write)
-            for materia in grade_table:
-                linha = []
-                materia = materia.find_elements(By.TAG_NAME, 'td')
-                nome_materia = materia[2].get_attribute('innerHTML')
-                nome_materia = nome_materia[nome_materia.rfind('-') + 2: len(nome_materia) - 1]
-                linha.append(nome_materia)
-                for i in range(9, 17):
-                    if i % 2 != 0: # pega somente as notas
-                        linha.append(materia[i].get_attribute('innerHTML'))
-                if notas != None:
-                    if not linha in notas:
-                        envia_mensagem(f'A nota de {linha[0].title()} mudou!!')
+    with open('notas.csv', 'w', encoding='utf-8', newline='') as arquivo_write:
+        w = csv.writer(arquivo_write)
+        for materia in grade_table:
+            linha = []
+            materia = materia.find_elements(By.TAG_NAME, 'td')
+            nome_materia = materia[2].get_attribute('innerHTML')
+            nome_materia = nome_materia[nome_materia.rfind('-') + 2: len(nome_materia) - 1]
+            linha.append(nome_materia)
+            for i in range(9, 17):
+                if i % 2 != 0: # pega somente as notas
+                    linha.append(materia[i].get_attribute('innerHTML'))
+            if notas != None and len(notas) != 0:
+                if not linha in notas:
+                    envia_mensagem(f'A nota de {linha[0].title()} mudou!!')
 
-                w.writerow(linha)
+            w.writerow(linha)
 
 
 def envia_mensagem(mensagem):
@@ -60,8 +59,7 @@ def verifica_arquivo():
 driver = webdriver.Chrome()
 acessa_suap(driver)
 get_notas(driver)
-sleep(5)
-schedule.every(15).minutes.do(get_notas, driver)
+schedule.every(10).minutes.do(get_notas, driver)
 
 while True:
     schedule.run_pending()
