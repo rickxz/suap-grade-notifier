@@ -22,4 +22,4 @@ $ cd suap-grade-notifier
 - csv
 - selenium
 - pywhatkit
-- Schedule
+- schedule
