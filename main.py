@@ -61,7 +61,7 @@ driver = webdriver.Chrome()
 acessa_suap(driver)
 get_notas(driver)
 sleep(5)
-schedule.every(5).seconds.do(get_notas, driver)
+schedule.every(15).minutes.do(get_notas, driver)
 
 while True:
     schedule.run_pending()
