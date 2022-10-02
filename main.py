@@ -60,7 +60,8 @@ def verifica_arquivo():
 driver = webdriver.Chrome()
 acessa_suap(driver)
 get_notas(driver)
-schedule.every(30).minutes.do(get_notas)
+sleep(5)
+schedule.every(5).seconds.do(get_notas, driver)
 
 while True:
     schedule.run_pending()
