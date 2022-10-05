@@ -4,6 +4,8 @@ import csv
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import schedule
 import pywhatkit
 import os.path
@@ -16,13 +18,15 @@ def acessa_suap(driver):
     password_input = driver.find_element(By.ID, 'id_password')
     password_input.send_keys(config('PASSWORD'))
     password_input.send_keys(Keys.ENTER)
-    sleep(1)
+    wait = WebDriverWait(driver, 10)
+    wait.until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/aside/nav/ul[1]/li[1]/a/span[2]")))
 
 
 def get_notas(driver):
     prontuario = config('USER')
     driver.get(f'https://suap.ifsp.edu.br/edu/aluno/{prontuario}/?tab=boletim')
-    sleep(5)
+    wait = WebDriverWait(driver, 10)
+    wait.until(EC.visibility_of_all_elements_located((By.CSS_SELECTOR, "tr[class^=' matricula_periodo_agrupamento']")))
     grade_table = driver.find_elements(By.CSS_SELECTOR, "tr[class^=' matricula_periodo_agrupamento']")
     notas = None
     if verifica_arquivo():  
@@ -42,7 +46,6 @@ def get_notas(driver):
             if notas != None and len(notas) != 0:
                 if not linha in notas:
                     envia_mensagem(f'A nota de {linha[0].title()} mudou!!')
-
             w.writerow(linha)
 
 
