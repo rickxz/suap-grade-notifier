@@ -5,6 +5,7 @@
 ```shell
 $ git clone https://github.com/rickxz/suap-grade-notifier.git
 $ cd suap-grade-notifier
+$ pip install -r requirements.txt
 ```
 
 #
