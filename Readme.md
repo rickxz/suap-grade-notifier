@@ -8,6 +8,8 @@ $ cd suap-grade-notifier
 $ pip install -r requirements.txt
 ```
 
+- Baixe o chromedriver.exe apropriado para o seu navegador e coloque-o no diretório do projeto. Para verificar qual a versão do chromedriver atual do seu navegador, cheque https://chromedriver.storage.googleapis.com/LATEST_RELEASE 
+
 #
 
 ## ⚙️ Configurar variáveis de ambiente (.env)
