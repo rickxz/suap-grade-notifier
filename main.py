@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 import schedule
 import pywhatkit
 import os.path
@@ -19,7 +20,10 @@ def acessa_suap(driver):
     password_input.send_keys(config('PASSWORD'))
     password_input.send_keys(Keys.ENTER)
     wait = WebDriverWait(driver, 10)
-    wait.until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/aside/nav/ul[1]/li[1]/a/span[2]")))
+    try:
+        wait.until(EC.visibility_of_element_located((By.XPATH, "/html/body/div[1]/aside/nav/ul[1]/li[1]/a/span[2]")))
+    except TimeoutException:
+        driver.find_element(By.XPATH, "/html/body/div[1]/a/span[1]").click()
 
 
 def get_notas(driver):
