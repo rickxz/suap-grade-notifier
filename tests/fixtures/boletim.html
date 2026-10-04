@@ -1,0 +1,109 @@
+<div class="tab-wrapper">
+  <div class="search-and-filters">
+    <div class="filter">
+      <label>Selecione o período: </label>
+      <select id='ano_periodo' name="ano_periodo"
+        hx-get="/edu/aluno/SC0000000/boletins/?etapa="
+        hx-target="closest .tab-wrapper">
+          <option value="2026_2">2026/2</option>
+          <option value="2026_1">2026/1</option>
+      </select>
+    </div>
+  </div>
+<table id="tabela_boletim" class="borda">
+  <thead>
+    <tr>
+        <th rowspan="2" class="align-center">Diário</th>
+        <th rowspan="2" class="align-center">Disciplina</th>
+        <th rowspan="2" class="align-center">C. H. Horas</th>
+        <th rowspan="2" class="align-center">C. H. Aulas</th>
+        <th rowspan="2" class="align-center">T. de Aulas Cumpridas</th>
+      <th rowspan="2" class="align-center">T. Faltas</th>
+      <th rowspan="2" class="align-center">% Freq.</th>
+      <th rowspan="2" class="align-center">Situação</th>
+          <th colspan="2" class="align-center">N1</th>
+      <th rowspan="2" class="align-center">MD</th>
+      <th colspan="2" class="align-center">NAF</th>
+      <th rowspan="2" class="align-center">MFD/<br/>Conceito</th>
+      <th rowspan="2" class="no-print align-center">Opções</th>
+    </tr>
+    <tr>
+          <th class="align-center">N</th>
+          <th class="align-center">F</th>
+      <th class="align-center">N</th>
+      <th class="align-center">F</th>
+    </tr>
+  </thead>
+  <tbody>
+      <tr class="">
+          <td class="align-center">
+                <a href="/edu/sala_virtual/111111/">111111</a>
+          </td>
+          <td>SUP.00001 (SCLAXD3)
+            - ATIVIDADES DE EXTENSÃO 3 </td>
+          <td class="align-center">100,00</td>
+          <td class="align-center">120 Aulas</td>
+          <td class="align-center">
+            <span
+                  class="status status-success"
+            >
+              120
+            </span>
+          </td>
+        <td class="align-center">12</td>
+        <td class="align-center">90,0%</td>
+            <td class="align-center"><span class="status status-success">Aprovado
+            </span></td>
+            <td class="align-center">7,70</td>
+            <td class="align-center">12</td>
+          <td class="align-center">7,70</td>
+          <td class="align-center">-</td>
+          <td class="align-center">0</td>
+          <td class="align-center">7,70</td>
+          <td class="no-print align-center"><a
+            href="/edu/detalhar_matricula_diario_boletim/100000/2000001/"
+            class="btn popup" data-reload-on-close="False">Detalhar</a></td>
+      </tr>
+      <tr class="">
+          <td class="align-center">
+                <a href="/edu/sala_virtual/111112/">111112</a>
+          </td>
+          <td>SUP.00002 (SCLCAL2)
+            - CÁLCULO II </td>
+          <td class="align-center">66,70</td>
+          <td class="align-center">80 Aulas</td>
+          <td class="align-center">
+            <span
+                  class="status status-warning"
+            >
+              36
+            </span>
+          </td>
+        <td class="align-center">4</td>
+        <td class="align-center">88,88%</td>
+            <td class="align-center"><span class="status status-info">Cursando
+            </span></td>
+            <td class="align-center">-</td>
+            <td class="align-center">4</td>
+          <td class="align-center">-</td>
+          <td class="align-center">-</td>
+          <td class="align-center">0</td>
+          <td class="align-center">-</td>
+          <td class="no-print align-center"><a
+            href="/edu/detalhar_matricula_diario_boletim/100000/2000002/"
+            class="btn popup" data-reload-on-close="False">Detalhar</a></td>
+      </tr>
+  </tbody>
+    <tfoot>
+      <tr>
+          <td colspan="2">Total</td>
+        <td class="align-center">166,70 Horas</td>
+        <td class="align-center">200 Aulas</td>
+        <td class="align-center">156</td>
+        <td class="align-center">16</td>
+        <td class="align-center">89,7%</td>
+        <td class="align-center" colspan="20">&nbsp;</td>
+      </tr>
+    </tfoot>
+</table>
+</div>
