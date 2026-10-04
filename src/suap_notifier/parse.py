@@ -7,14 +7,15 @@ from .model import Assessment, Subject
 EMPTY_VALUES = {"", "-", "--"}
 SMALL_WORDS = {"a", "as", "o", "os", "e", "de", "da", "das", "do", "dos", "em", "para", "com"}
 ROMAN_NUMERALS = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII"}
-AVERAGE_LABELS ={"MD": "MD", "MFD/Conceito": "MFD"}
+AVERAGE_LABELS = {"MD": "MD", "MFD/Conceito": "MFD"}
 
 
-def parse_boletim(html: str) -> list[Subject]:
+def parse_boletim(html: str) -> list[Subject] | None:
+    """Returns None when the page isn't a boletim at all (maintenance page, layout change)."""
     soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", id="tabela_boletim")
     if table is None:
-        return []
+        return None
 
     labels = _column_labels(table)
     subjects = []
@@ -27,8 +28,11 @@ def parse_boletim(html: str) -> list[Subject]:
     return subjects
 
 
-def parse_detail(html: str) -> dict[str, Assessment]:
+def parse_detail(html: str) -> dict[str, Assessment] | None:
+    """Returns None when the page lacks the "Detalhamento das Notas" section."""
     soup = BeautifulSoup(html, "html.parser")
+    if soup.find("h3", string=lambda s: s and "Detalhamento das Notas" in s) is None:
+        return None
     assessments: dict[str, Assessment] = {}
     for heading in soup.find_all("h4"):
         table = heading.find_next("table")

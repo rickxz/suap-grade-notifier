@@ -24,7 +24,7 @@ $toast = New-Object Windows.UI.Notifications.ToastNotification($doc)
 """
 
 
-def show(title: str, lines: list[str], url: str | None = None) -> None:
+def show(title: str, lines: list[str], url: str | None = None) -> bool:
     if len(lines) > MAX_LINES:
         lines = lines[: MAX_LINES - 1] + [f"e mais {len(lines) - MAX_LINES + 1}..."]
     body = "\n".join(lines)
@@ -32,7 +32,7 @@ def show(title: str, lines: list[str], url: str | None = None) -> None:
 
     if os.name != "nt":
         print(f"[{title}]\n{body}")
-        return
+        return True
 
     launch = f" activationType=\"protocol\" launch={quoteattr(url)}" if url else ""
     xml = (
@@ -41,9 +41,17 @@ def show(title: str, lines: list[str], url: str | None = None) -> None:
         "</binding></visual></toast>"
     )
     script = TOAST_SCRIPT.format(payload=base64.b64encode(xml.encode()).decode(), app_id=APP_ID)
-    subprocess.run(
-        [POWERSHELL, "-NoProfile", "-NonInteractive", "-Command", script],
-        check=False,
-        capture_output=True,
-        creationflags=subprocess.CREATE_NO_WINDOW,
-    )
+    try:
+        result = subprocess.run(
+            [POWERSHELL, "-NoProfile", "-NonInteractive", "-Command", script],
+            check=False,
+            capture_output=True,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
+    except OSError as exc:
+        log.error("could not start PowerShell for the toast: %s", exc)
+        return False
+    if result.returncode != 0:
+        log.error("toast failed (exit %s): %s", result.returncode, result.stderr.decode(errors="replace").strip())
+        return False
+    return True

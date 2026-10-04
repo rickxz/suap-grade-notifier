@@ -24,7 +24,7 @@ $PythonW = Join-Path $Venv "Scripts\pythonw.exe"
 if ($Uninstall) {
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
     if (Test-Path $Python) {
-        & $Python -c "import keyring; from suap_notifier.app import KEYRING_SERVICE as s, KEYRING_USER_ENTRY as u; p = keyring.get_password(s, u); [keyring.delete_password(s, k) for k in (p, u) if k and keyring.get_password(s, k)]"
+        & $Python -c "from suap_notifier.app import Credentials; Credentials.forget()"
     }
     Remove-Item -Recurse -Force $AppDir -ErrorAction SilentlyContinue
     Write-Host "Desinstalado: tarefa, senha salva e dados em $AppDir removidos."
@@ -48,9 +48,11 @@ if (-not $SkipSetup) {
 }
 
 $action = New-ScheduledTaskAction -Execute $PythonW -Argument "-m suap_notifier run" -WorkingDirectory $AppDir
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
-# An AtLogOn trigger can't take an interval directly, so borrow the repetition pattern from a -Once trigger
-$trigger.Repetition = (New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes)).Repetition
+# The time-based trigger repeats from now on (surviving reboots); the logon one adds an immediate check after signing in
+$triggers = @(
+    (New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"),
+    (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes $IntervalMinutes))
+)
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
     -RunOnlyIfNetworkAvailable `
@@ -60,6 +62,6 @@ $settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
 $principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType Interactive -RunLevel Limited
 
-Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force | Out-Null
+Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers -Settings $settings -Principal $principal -Force | Out-Null
 Write-Host "Tarefa '$TaskName' agendada: ao entrar no Windows e a cada $IntervalMinutes minutos."
 Write-Host "Log: $AppDir\notifier.log"

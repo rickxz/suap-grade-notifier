@@ -34,6 +34,17 @@ class Credentials:
         keyring.set_password(KEYRING_SERVICE, KEYRING_USER_ENTRY, self.prontuario)
         keyring.set_password(KEYRING_SERVICE, self.prontuario, self.password)
 
+    @staticmethod
+    def stored_prontuario() -> str | None:
+        return keyring.get_password(KEYRING_SERVICE, KEYRING_USER_ENTRY)
+
+    @staticmethod
+    def forget() -> None:
+        prontuario = keyring.get_password(KEYRING_SERVICE, KEYRING_USER_ENTRY)
+        for entry in (prontuario, KEYRING_USER_ENTRY):
+            if entry and keyring.get_password(KEYRING_SERVICE, entry) is not None:
+                keyring.delete_password(KEYRING_SERVICE, entry)
+
 
 def fetch(state: State, creds: Credentials) -> Snapshot:
     if state.session is None:
@@ -43,7 +54,10 @@ def fetch(state: State, creds: Credentials) -> Snapshot:
     except SessionExpired:
         log.info("session expired, logging in again")
         state.session = browser_login(creds.prontuario, creds.password)
+    try:
         return _fetch_with_session(state, creds)
+    except SessionExpired:
+        raise LoginFailed("SUAP rejected the session right after logging in") from None
 
 
 def _fetch_with_session(state: State, creds: Credentials) -> Snapshot:
@@ -56,6 +70,14 @@ def _fetch_with_session(state: State, creds: Credentials) -> Snapshot:
 
 def run() -> None:
     state = State.load()
+    try:
+        _check(state)
+    finally:
+        # Even failed runs may have logged in again or received re-signed cookies worth keeping
+        state.save()
+
+
+def _check(state: State) -> None:
     creds = Credentials.load()
     if creds is None:
         _alert_once(state, "no-credentials", "SUAP Notifier não configurado", ["Rode: python -m suap_notifier setup"])
@@ -81,18 +103,22 @@ def run() -> None:
         return
 
     state.alerted = None
-    previous, state.snapshot = state.snapshot, snapshot
-    if previous is None:
+    if state.snapshot is None:
         log.info("baseline saved with %d subjects", len(snapshot.subjects))
-        state.save()
+        state.snapshot = snapshot
         return
 
-    changes = diff(previous, snapshot)
+    changes = diff(state.snapshot, snapshot)
     log.info("%d change(s) found", len(changes))
-    if changes:
-        title = "SUAP: 1 atualização no boletim" if len(changes) == 1 else f"SUAP: {len(changes)} atualizações no boletim"
-        notify.show(title, [change.describe() for change in changes], boletim_url(creds.prontuario))
-    state.save()
+    if not changes:
+        state.snapshot = snapshot
+        return
+
+    title = "SUAP: 1 atualização no boletim" if len(changes) == 1 else f"SUAP: {len(changes)} atualizações no boletim"
+    if not notify.show(title, [change.describe() for change in changes], boletim_url(creds.prontuario)):
+        log.warning("notification failed, keeping the previous snapshot so these changes are reported next run")
+        return
+    state.snapshot = snapshot
 
 
 def dry_run() -> Snapshot:
@@ -108,9 +134,14 @@ def dry_run() -> Snapshot:
 def setup(prontuario: str, password: str) -> int:
     creds = Credentials(prontuario.strip().upper(), password)
     session = browser_login(creds.prontuario, creds.password)
-    creds.save()
 
     state = State.load()
+    previous_prontuario = Credentials.stored_prontuario()
+    if previous_prontuario and previous_prontuario != creds.prontuario:
+        # Another student's grades must not be diffed against this account's
+        Credentials.forget()
+        state.snapshot = None
+    creds.save()
     state.session, state.alerted = session, None
     snapshot = _fetch_with_session(state, creds)
     # Re-running setup (e.g. after a password change) must not swallow changes since the last run
@@ -133,6 +164,5 @@ def interactive_login() -> None:
 def _alert_once(state: State, reason: str, title: str, lines: list[str]) -> None:
     if state.alerted == reason:
         return
-    notify.show(title, lines)
-    state.alerted = reason
-    state.save()
+    if notify.show(title, lines):
+        state.alerted = reason

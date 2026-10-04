@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from .client import Session
 from .model import Snapshot
+
+log = logging.getLogger(__name__)
 
 
 def data_dir() -> Path:
@@ -33,10 +36,17 @@ class State:
         path = data_dir() / "state.json"
         if not path.exists():
             return cls()
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        snapshot = Snapshot.from_dict(raw["snapshot"]) if raw.get("snapshot") is not None else None
-        session = Session(**raw["session"]) if raw.get("session") else None
-        return cls(session=session, snapshot=snapshot, alerted=raw.get("alerted"))
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            snapshot = Snapshot.from_dict(raw["snapshot"]) if raw.get("snapshot") is not None else None
+            session = Session(**raw["session"]) if raw.get("session") else None
+            return cls(session=session, snapshot=snapshot, alerted=raw.get("alerted"))
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            # Starting over only costs a silent new baseline; crashing would stop every future run
+            corrupt = path.with_suffix(".corrupt.json")
+            log.warning("unreadable state file (%s), moved to %s", exc, corrupt.name)
+            path.replace(corrupt)
+            return cls()
 
     def save(self) -> None:
         path = data_dir() / "state.json"

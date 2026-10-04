@@ -26,8 +26,8 @@ def test_boletim_reads_summary_columns():
     assert calculo.averages == {"N1": None, "MD": None, "NAF": None, "MFD": None}
 
 
-def test_boletim_without_table_returns_nothing():
-    assert parse_boletim("<div>Nenhum boletim</div>") == []
+def test_page_without_boletim_table_is_not_a_boletim():
+    assert parse_boletim("<div>Sistema em manutenção</div>") is None
 
 
 def test_detail_reads_assessments_per_etapa():
@@ -43,3 +43,11 @@ def test_detail_maps_dashes_to_none():
 
     assert final.tipo == "Prova"
     assert (final.descricao, final.data, final.peso, final.nota) == (None, None, None, None)
+
+
+def test_page_without_detalhamento_is_not_a_detail_page():
+    assert parse_detail("<h2>Sistema em manutenção</h2>") is None
+
+
+def test_detail_page_without_assessments_is_empty():
+    assert parse_detail("<h3>Detalhamento das Notas</h3><div></div>") == {}

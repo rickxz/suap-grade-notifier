@@ -38,11 +38,38 @@ def test_redirect_to_login_means_session_expired():
         client.fetch_snapshot("SC0000000")
 
 
-def test_forbidden_detail_means_session_expired():
+def test_forbidden_boletim_means_session_expired():
     client = client_with(lambda r: httpx.Response(403))
 
     with pytest.raises(SessionExpired):
         client.fetch_snapshot("SC0000000")
+
+
+def test_forbidden_detail_after_boletim_is_not_a_session_problem():
+    def handler(request):
+        return httpx.Response(200, text=BOLETIM) if request.url.path.endswith("/boletins/") else httpx.Response(403)
+
+    with pytest.raises(SuapUnavailable):
+        client_with(handler).fetch_snapshot("SC0000000")
+
+
+@pytest.mark.parametrize("status", [404, 429])
+def test_other_client_errors_mean_unavailable(status):
+    with pytest.raises(SuapUnavailable):
+        client_with(lambda r: httpx.Response(status)).fetch_snapshot("SC0000000")
+
+
+def test_maintenance_page_instead_of_boletim_means_unavailable():
+    with pytest.raises(SuapUnavailable):
+        client_with(lambda r: httpx.Response(200, text="<h1>Manutenção</h1>")).fetch_snapshot("SC0000000")
+
+
+def test_maintenance_page_instead_of_detail_means_unavailable():
+    def handler(request):
+        return httpx.Response(200, text=BOLETIM if request.url.path.endswith("/boletins/") else "<h1>Manutenção</h1>")
+
+    with pytest.raises(SuapUnavailable):
+        client_with(handler).fetch_snapshot("SC0000000")
 
 
 def test_server_error_means_unavailable():

@@ -29,6 +29,7 @@ def main() -> None:
     sub.add_parser("setup", help="salva prontuário e senha e cria o estado inicial")
     sub.add_parser("login", help="abre o Edge para login manual quando o automático falhar")
     sub.add_parser("test-notification", help="mostra uma notificação de teste")
+    parser.set_defaults(dry_run=False)
     args = parser.parse_args()
 
     configure_logging()

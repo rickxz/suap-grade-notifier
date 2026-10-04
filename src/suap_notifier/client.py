@@ -60,11 +60,25 @@ class SuapClient:
         return Session({cookie.name: cookie.value for cookie in self.http.cookies.jar}, self.user_agent)
 
     def fetch_snapshot(self, prontuario: str) -> Snapshot:
+        # Partial data is never returned: saving it would make the next full fetch re-report every grade
         subjects = parse_boletim(self._get(f"/edu/aluno/{prontuario.upper()}/boletins/"))
+        if subjects is None:
+            raise SuapUnavailable("boletim table not found")
         for subject in subjects:
-            if subject.detail_url:
-                subject.assessments = parse_detail(self._get(subject.detail_url))
+            if not subject.detail_url:
+                continue
+            assessments = parse_detail(self._get_detail(subject.detail_url))
+            if assessments is None:
+                raise SuapUnavailable(f"grade details not found at {subject.detail_url}")
+            subject.assessments = assessments
         return Snapshot({subject.diario: subject for subject in subjects})
+
+    def _get_detail(self, path: str) -> str:
+        try:
+            return self._get(path)
+        except SessionExpired:
+            # The boletim was just served with this session, so a 403 here is about this page, not the login
+            raise SuapUnavailable(f"detail page refused with a valid session: {path}") from None
 
     def _get(self, path: str) -> str:
         try:
@@ -77,7 +91,6 @@ class SuapClient:
             raise SessionExpired
         if response.status_code in (401, 403):
             raise SessionExpired
-        if response.status_code >= 500 or response.is_redirect:
+        if not response.is_success:
             raise SuapUnavailable(f"GET {path} -> {response.status_code}")
-        response.raise_for_status()
         return response.text
