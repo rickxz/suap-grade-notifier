@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from suap_notifier.parse import parse_boletim, parse_detail
+import pytest
+
+from suap_notifier.parse import LayoutChanged, parse_boletim, parse_detail
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -24,6 +26,32 @@ def test_boletim_reads_summary_columns():
     assert calculo.name == "Cálculo II"
     assert calculo.situacao == "Cursando"
     assert calculo.averages == {"N1": None, "MD": None, "NAF": None, "MFD": None}
+
+
+def test_boletim_layout_from_2026_10_reads_the_same_fields():
+    [estrutura] = parse_boletim((FIXTURES / "boletim_2026_10.html").read_text(encoding="utf-8"))
+
+    assert estrutura.diario == "111113"
+    assert estrutura.name == "Estrutura de Dados"
+    assert estrutura.situacao == "Cursando"
+    assert estrutura.faltas == 8
+    assert estrutura.frequencia == "80,0%"
+    assert estrutura.averages == {"N1": "6,40", "MD": "6,40", "NAF": None, "MFD": None}
+    assert estrutura.detail_url == "/edu/detalhar_matricula_diario_boletim/100000/2000003/"
+
+
+def test_both_layouts_use_the_same_average_keys():
+    old = parse_boletim((FIXTURES / "boletim.html").read_text(encoding="utf-8"))[0]
+    new = parse_boletim((FIXTURES / "boletim_2026_10.html").read_text(encoding="utf-8"))[0]
+
+    assert old.averages.keys() == new.averages.keys()
+
+
+def test_table_without_subject_columns_is_a_layout_change():
+    html = '<table id="tabela_boletim"><thead><tr><th>Componente</th></tr></thead><tbody><tr><td>X</td></tr></tbody></table>'
+
+    with pytest.raises(LayoutChanged):
+        parse_boletim(html)
 
 
 def test_page_without_boletim_table_is_not_a_boletim():

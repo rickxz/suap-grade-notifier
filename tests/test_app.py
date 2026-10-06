@@ -4,6 +4,7 @@ from suap_notifier import app
 from suap_notifier.auth import LoginFailed
 from suap_notifier.client import Session, SessionExpired, SuapUnavailable
 from suap_notifier.model import Assessment, Snapshot, Subject
+from suap_notifier.parse import LayoutChanged
 from suap_notifier.state import State, data_dir
 
 
@@ -99,3 +100,31 @@ def test_corrupt_state_file_starts_over(env):
 
     assert State.load() == State()
     assert (data_dir() / "state.corrupt.json").exists()
+
+
+def test_layout_change_alerts_once_and_keeps_the_snapshot(env, monkeypatch):
+    save_state(session=Session({"sessionid": "a"}), snapshot=snapshot("8,00"))
+
+    def fetch(state, creds):
+        raise LayoutChanged("no DISCIPLINA column")
+
+    monkeypatch.setattr(app, "fetch", fetch)
+
+    app.run()
+    app.run()
+
+    assert [title for title, _ in env] == ["O SUAP mudou a página do boletim"]
+    assert State.load().snapshot == snapshot("8,00")
+
+
+def test_unexpected_failure_alerts_once_and_still_fails(env, monkeypatch):
+    def fetch(state, creds):
+        raise KeyError("Disciplina")
+
+    monkeypatch.setattr(app, "fetch", fetch)
+
+    for _ in range(2):
+        with pytest.raises(KeyError):
+            app.run()
+
+    assert [title for title, _ in env] == ["SUAP Notifier parou de funcionar"]

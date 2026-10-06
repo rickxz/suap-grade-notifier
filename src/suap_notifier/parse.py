@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import re
+import unicodedata
+
 from bs4 import BeautifulSoup, Tag
 
 from .model import Assessment, Subject
@@ -7,17 +10,32 @@ from .model import Assessment, Subject
 EMPTY_VALUES = {"", "-", "--"}
 SMALL_WORDS = {"a", "as", "o", "os", "e", "de", "da", "das", "do", "dos", "em", "para", "com"}
 ROMAN_NUMERALS = {"I", "II", "III", "IV", "V", "VI", "VII", "VIII"}
-AVERAGE_LABELS = {"MD": "MD", "MFD/Conceito": "MFD"}
+# Labels are compared accent-free and uppercased; SUAP has renamed these columns before (2026-10)
+FALTAS_LABELS = ("T. FALTAS", "TOTAL DE FALTAS")
+FIXED_AVERAGES = {"MD": "MD", "MEDIA": "MD", "NAF": "NAF", "NAF/N": "NAF", "MFD/CONCEITO": "MFD"}
+ETAPA_AVERAGE = re.compile(r"(?:N|ETAPA )(\d)/(?:N|NOTA)")
+COURSE_CODE = re.compile(r"[A-Z]+\.\d+")
+CLASS_CODE = re.compile(r"\([A-Z0-9]+\)")
+
+
+class LayoutChanged(Exception):
+    pass
 
 
 def parse_boletim(html: str) -> list[Subject] | None:
-    """Returns None when the page isn't a boletim at all (maintenance page, layout change)."""
+    """Returns None when there is no boletim table (e.g. maintenance page).
+
+    Raises LayoutChanged when the table exists but lacks the columns needed to identify subjects.
+    """
     soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", id="tabela_boletim")
     if table is None:
         return None
 
-    labels = _column_labels(table)
+    labels = [_normalize(label) for label in _column_labels(table)]
+    missing = {"DIARIO", "DISCIPLINA"} - set(labels)
+    if missing:
+        raise LayoutChanged(f"boletim columns {sorted(missing)} not found in {labels}")
     subjects = []
     for row in table.select("tbody > tr"):
         cells = row.find_all("td", recursive=False)
@@ -65,32 +83,37 @@ def _column_labels(table: Tag) -> list[str]:
 
 
 def _subject_from_row(columns: dict[str, Tag]) -> Subject:
-    detail_link = columns["Opções"].find("a", string=lambda s: s and s.strip() == "Detalhar") if "Opções" in columns else None
-    faltas = _value(columns.get("T. Faltas"))
+    options = columns.get("OPCOES")
+    detail_link = options.find("a", string=lambda s: s and s.strip() == "Detalhar") if options else None
+    faltas = _value(next((columns[label] for label in FALTAS_LABELS if label in columns), None))
+    faltas_count = re.match(r"\d+", faltas) if faltas else None
     return Subject(
-        diario=_text(columns["Diário"]),
-        name=_subject_name(_text(columns["Disciplina"])),
-        situacao=_value(columns.get("Situação")),
-        faltas=int(faltas) if faltas and faltas.isdigit() else None,
-        frequencia=_value(columns.get("% Freq.")),
+        diario=_text(columns["DIARIO"]),
+        name=_subject_name(_text(columns["DISCIPLINA"])),
+        situacao=_value(columns.get("SITUACAO")),
+        faltas=int(faltas_count.group()) if faltas_count else None,
+        frequencia=_value(columns.get("% FREQ.")),
         averages=_averages(columns),
         detail_url=detail_link["href"] if detail_link else None,
     )
 
 
 def _averages(columns: dict[str, Tag]) -> dict[str, str | None]:
+    # Keys stay N1/MD/NAF/MFD across layouts so saved snapshots keep diffing cleanly
     averages = {}
     for label, cell in columns.items():
-        if label in AVERAGE_LABELS:
-            averages[AVERAGE_LABELS[label]] = _value(cell)
-        elif label.endswith("/N"):
-            averages[label.removesuffix("/N")] = _value(cell)
+        etapa = ETAPA_AVERAGE.fullmatch(label)
+        if etapa:
+            averages[f"N{etapa.group(1)}"] = _value(cell)
+        elif label in FIXED_AVERAGES:
+            averages[FIXED_AVERAGES[label]] = _value(cell)
     return averages
 
 
 def _subject_name(disciplina: str) -> str:
-    # "SUP.11857 (SCLAXD3) - ATIVIDADES DE EXTENSÃO 3" -> "Atividades de Extensão 3"
-    raw = disciplina.split(" - ", 1)[-1]
+    # Both "SUP.11857 (SCLAXD3) - ATIVIDADES DE EXTENSÃO 3" and "ESTRUTURA DE DADOS (SCLESDD) - SUP.11771"
+    parts = re.split(r"\s+-\s+", CLASS_CODE.sub("", disciplina))
+    raw = " - ".join(part.strip() for part in parts if part.strip() and not COURSE_CODE.fullmatch(part.strip()))
     return " ".join(_title_word(word, i) for i, word in enumerate(raw.lower().split()))
 
 
@@ -111,3 +134,8 @@ def _value(cell: Tag | None) -> str | None:
 
 def _text(tag: Tag, separator: str = " ") -> str:
     return " ".join(tag.get_text(separator).split())
+
+
+def _normalize(label: str) -> str:
+    stripped = "".join(c for c in unicodedata.normalize("NFKD", label) if not unicodedata.combining(c))
+    return " ".join(stripped.upper().split())
