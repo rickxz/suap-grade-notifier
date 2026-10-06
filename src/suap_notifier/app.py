@@ -9,12 +9,14 @@ from . import notify
 from .auth import BadCredentials, LoginFailed, browser_login
 from .client import SessionExpired, SuapClient, SuapUnavailable, boletim_url
 from .model import Snapshot, diff
+from .parse import LayoutChanged
 from .state import State
 
 log = logging.getLogger(__name__)
 
 KEYRING_SERVICE = "suap-notifier"
 KEYRING_USER_ENTRY = "prontuario"
+LOG_HINT = r"%LOCALAPPDATA%\suap-notifier\notifier.log"
 
 
 @dataclass
@@ -72,6 +74,10 @@ def run() -> None:
     state = State.load()
     try:
         _check(state)
+    except Exception:
+        # Without a toast, a crash only shows up in a log nobody reads while every run keeps failing
+        _alert_once(state, "unexpected", "SUAP Notifier parou de funcionar", [f"Veja o log: {LOG_HINT}"])
+        raise
     finally:
         # Even failed runs may have logged in again or received re-signed cookies worth keeping
         state.save()
@@ -100,6 +106,15 @@ def _check(state: State) -> None:
         return
     except SuapUnavailable as exc:
         log.warning("SUAP unavailable: %s", exc)
+        return
+    except LayoutChanged as exc:
+        log.error("SUAP changed the boletim layout: %s", exc)
+        _alert_once(
+            state,
+            "layout-changed",
+            "O SUAP mudou a página do boletim",
+            ["O notificador precisa ser atualizado.", f"Detalhes no log: {LOG_HINT}"],
+        )
         return
 
     state.alerted = None
