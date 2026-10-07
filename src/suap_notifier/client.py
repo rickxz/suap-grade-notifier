@@ -86,10 +86,9 @@ class SuapClient:
         except httpx.HTTPError as exc:
             raise SuapUnavailable(str(exc)) from exc
 
-        # Without a valid session the boletim redirects to login and the detail page answers 403
-        if response.is_redirect and LOGIN_PATH in response.headers.get("location", ""):
-            raise SessionExpired
-        if response.status_code in (401, 403):
+        # Logged-in pages never redirect: without a session SUAP sends the boletim to "/" (not the
+        # login page) and answers 403 on detail pages
+        if response.is_redirect or response.status_code in (401, 403):
             raise SessionExpired
         if not response.is_success:
             raise SuapUnavailable(f"GET {path} -> {response.status_code}")

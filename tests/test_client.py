@@ -38,6 +38,14 @@ def test_redirect_to_login_means_session_expired():
         client.fetch_snapshot("SC0000000")
 
 
+def test_redirect_to_home_means_session_expired():
+    # What SUAP actually answers for an expired session (observed 2026-10-07)
+    client = client_with(lambda r: httpx.Response(302, headers={"location": "/"}))
+
+    with pytest.raises(SessionExpired):
+        client.fetch_snapshot("SC0000000")
+
+
 def test_forbidden_boletim_means_session_expired():
     client = client_with(lambda r: httpx.Response(403))
 
