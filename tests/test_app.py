@@ -128,3 +128,53 @@ def test_unexpected_failure_alerts_once_and_still_fails(env, monkeypatch):
             app.run()
 
     assert [title for title, _ in env] == ["SUAP Notifier parou de funcionar"]
+
+
+def test_expired_session_redirecting_home_triggers_a_new_login(env, monkeypatch):
+    save_state(session=Session({"sessionid": "old"}), snapshot=snapshot("8,00"))
+    logins = []
+
+    def browser_login(*args, **kwargs):
+        logins.append(args)
+        return Session({"sessionid": "fresh"})
+
+    def fetch_with_session(state, creds):
+        if state.session.cookies["sessionid"] == "old":
+            raise SessionExpired
+        return snapshot("8,00")
+
+    monkeypatch.setattr(app, "browser_login", browser_login)
+    monkeypatch.setattr(app, "_fetch_with_session", fetch_with_session)
+
+    app.run()
+
+    assert len(logins) == 1
+    assert State.load().session.cookies == {"sessionid": "fresh"}
+
+
+def test_repeated_unavailability_alerts_once_after_the_threshold(env, monkeypatch):
+    save_state(session=Session({"sessionid": "a"}), snapshot=snapshot(None))
+
+    def fetch(state, creds):
+        raise SuapUnavailable("GET /boletins/ -> 502")
+
+    monkeypatch.setattr(app, "fetch", fetch)
+
+    for _ in range(app.FAILURES_BEFORE_ALERT - 1):
+        app.run()
+    assert env == []
+
+    app.run()
+    app.run()
+
+    assert [title for title, _ in env] == ["SUAP Notifier não está conseguindo verificar o boletim"]
+
+
+def test_success_resets_the_failure_count(env, monkeypatch):
+    save_state(session=Session({"sessionid": "a"}), snapshot=snapshot(None), consecutive_failures=2, alerted="unavailable")
+    monkeypatch.setattr(app, "fetch", lambda state, creds: snapshot(None))
+
+    app.run()
+
+    saved = State.load()
+    assert (saved.consecutive_failures, saved.alerted) == (0, None)

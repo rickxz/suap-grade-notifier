@@ -30,6 +30,7 @@ class State:
     snapshot: Snapshot | None = None
     # Last failure we already toasted about, so a broken login doesn't notify every 30 minutes
     alerted: str | None = None
+    consecutive_failures: int = 0
 
     @classmethod
     def load(cls) -> State:
@@ -40,7 +41,12 @@ class State:
             raw = json.loads(path.read_text(encoding="utf-8"))
             snapshot = Snapshot.from_dict(raw["snapshot"]) if raw.get("snapshot") is not None else None
             session = Session(**raw["session"]) if raw.get("session") else None
-            return cls(session=session, snapshot=snapshot, alerted=raw.get("alerted"))
+            return cls(
+                session=session,
+                snapshot=snapshot,
+                alerted=raw.get("alerted"),
+                consecutive_failures=raw.get("consecutive_failures", 0),
+            )
         except (ValueError, TypeError, KeyError, AttributeError) as exc:
             # Starting over only costs a silent new baseline; crashing would stop every future run
             corrupt = path.with_suffix(".corrupt.json")
@@ -54,6 +60,7 @@ class State:
             "session": asdict(self.session) if self.session else None,
             "snapshot": self.snapshot.to_dict() if self.snapshot else None,
             "alerted": self.alerted,
+            "consecutive_failures": self.consecutive_failures,
         }
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

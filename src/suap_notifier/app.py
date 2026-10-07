@@ -17,6 +17,8 @@ log = logging.getLogger(__name__)
 KEYRING_SERVICE = "suap-notifier"
 KEYRING_USER_ENTRY = "prontuario"
 LOG_HINT = r"%LOCALAPPDATA%\suap-notifier\notifier.log"
+# Three scheduled runs (~1h30): long enough to ride out a brief SUAP outage, short enough not to lose a day
+FAILURES_BEFORE_ALERT = 3
 
 
 @dataclass
@@ -105,7 +107,16 @@ def _check(state: State) -> None:
         )
         return
     except SuapUnavailable as exc:
-        log.warning("SUAP unavailable: %s", exc)
+        state.consecutive_failures += 1
+        log.warning("SUAP unavailable (%d in a row): %s", state.consecutive_failures, exc)
+        if state.consecutive_failures < FAILURES_BEFORE_ALERT:
+            return
+        _alert_once(
+            state,
+            "unavailable",
+            "SUAP Notifier não está conseguindo verificar o boletim",
+            [f"{state.consecutive_failures} tentativas seguidas falharam.", f"Veja o log: {LOG_HINT}"],
+        )
         return
     except LayoutChanged as exc:
         log.error("SUAP changed the boletim layout: %s", exc)
@@ -117,7 +128,7 @@ def _check(state: State) -> None:
         )
         return
 
-    state.alerted = None
+    state.alerted, state.consecutive_failures = None, 0
     if state.snapshot is None:
         log.info("baseline saved with %d subjects", len(snapshot.subjects))
         state.snapshot = snapshot
